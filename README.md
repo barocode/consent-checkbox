@@ -13,7 +13,7 @@
 ## Подключение через CDN
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.2/dist/consent-checkbox.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.3/dist/consent-checkbox.min.js"></script>
 <script>
     ConsentCheckbox.init({
         policyUrl: '/privacy-policy'
@@ -117,7 +117,7 @@ ConsentCheckbox.init(options);
 ConsentCheckbox.applyTo(document.querySelector('#myForm'), options);
 
 // Версия
-ConsentCheckbox.version; // '1.0.2'
+ConsentCheckbox.version; // '1.0.3'
 ```
 
 ## Стилизация

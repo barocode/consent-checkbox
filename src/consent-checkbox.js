@@ -1,5 +1,5 @@
 /*!
- * ConsentCheckbox.js v1.0.2
+ * ConsentCheckbox.js v1.0.3
  * Универсальная библиотека для добавления чекбокса согласия на обработку
  * персональных данных ко всем формам на странице.
  *
@@ -76,9 +76,11 @@
         autoInjectLink: true,
 
         // Если найденный блок декларативный ("Нажимая кнопку, вы соглашаетесь...")
-        // и не содержит чекбокса - вставить настоящий <input type="checkbox">
-        // в начало блока и привязать к нему блокировку submit.
-        // false - оставить блок текстовым, без активного чекбокса.
+        // и не содержит чекбокса - заменить его текст на options.text и
+        // вставить настоящий <input type="checkbox"> в начало блока,
+        // привязав к нему блокировку submit. URL для ссылки берётся из
+        // существующей ссылки блока (если была), иначе из options.policyUrl.
+        // false - оставить текст блока как есть, только править/добавлять ссылку.
         autoInjectCheckbox: true,
 
         // Колбэки
@@ -172,7 +174,7 @@
         '.consent-checkbox a{color:#0066cc;text-decoration:underline}',
         '.consent-checkbox a:hover{text-decoration:none}',
         'button.cc-disabled,input.cc-disabled{opacity:.6;cursor:not-allowed!important}',
-        '.cc-tooltip{position:absolute;z-index:9999;background:#fff;border:1px solid #d0d0d0;border-radius:6px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:13px;line-height:1.4;color:#333;max-width:340px;font-family:inherit;animation:cc-fade .2s ease}',
+        '.cc-tooltip{position:fixed;z-index:2147483647;background:#fff;border:1px solid #d0d0d0;border-radius:6px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:13px;line-height:1.4;color:#333;max-width:340px;font-family:inherit;animation:cc-fade .2s ease}',
         '.cc-tooltip::before{content:"";position:absolute;top:-6px;left:20px;width:10px;height:10px;background:#fff;border-left:1px solid #d0d0d0;border-top:1px solid #d0d0d0;transform:rotate(45deg)}',
         '.cc-tooltip .consent-checkbox{margin:0}',
         '.cc-converted-block{display:block;opacity:1}',
@@ -367,10 +369,45 @@
             var anchor = getAnchor();
             if (!anchor) return;
             var rect = anchor.getBoundingClientRect();
-            var top = rect.bottom + window.pageYOffset + 8;
-            var left = rect.left + window.pageXOffset;
-            tooltip.style.top = top + 'px';
-            tooltip.style.left = left + 'px';
+            // position:fixed - координаты относительно viewport,
+            // pageXOffset/pageYOffset не нужны
+            tooltip.style.top = (rect.bottom + 8) + 'px';
+            tooltip.style.left = rect.left + 'px';
+
+            // Авто-z-index: на некоторых сайтах модалки уходят выше 2147483647
+            // через создание новых stacking-контекстов. Сканируем видимые
+            // элементы под точкой якоря и поднимаемся выше самого высокого.
+            ensureOnTop();
+        }
+
+        // Поднимает z-index tooltip выше любого элемента, перекрывающего якорь.
+        // Использует elementsFromPoint - дёшево и точно.
+        function ensureOnTop() {
+            if (!document.elementsFromPoint) return;
+            var anchor = getAnchor();
+            if (!anchor) return;
+            var rect = anchor.getBoundingClientRect();
+            var x = rect.left + rect.width / 2;
+            var y = rect.top + rect.height / 2;
+            var stack = document.elementsFromPoint(x, y) || [];
+            var maxZ = 0;
+            for (var i = 0; i < stack.length; i++) {
+                var el = stack[i];
+                if (el === tooltip || tooltip.contains(el)) continue;
+                var z = parseInt(window.getComputedStyle(el).zIndex, 10);
+                if (!isNaN(z) && z > maxZ) maxZ = z;
+            }
+            if (maxZ >= 2147483647) {
+                // Кто-то уже на максимуме - переезжаем в конец body, чтобы
+                // победить за счёт порядка в DOM (при равном z-index выигрывает
+                // последний в дереве).
+                if (tooltip.parentNode !== document.body ||
+                    tooltip !== document.body.lastElementChild) {
+                    document.body.appendChild(tooltip);
+                }
+            } else if (maxZ > 0) {
+                tooltip.style.zIndex = String(Math.min(maxZ + 1, 2147483647));
+            }
         }
 
         function showTooltip() {
@@ -566,26 +603,45 @@
             return true;
         }
 
-        // Чекбокса нет - это декларативный блок ("Нажимая кнопку, я соглашаюсь...")
-        // Шаг 1: корректируем/добавляем ссылку на политику.
-        var linkUpdated = updatePolicyLink(block, options);
-
-        // Если ссылки не было и autoInjectLink=true - добавляем её
-        if (!linkUpdated && options.autoInjectLink) {
-            injectPolicyLink(block, options);
-        }
-
-        // Шаг 2: вставляем настоящий чекбокс в блок (превращаем декларативный
-        // блок в активный) и привязываем к нему блокировку submit.
+        // Чекбокса нет - это декларативный блок ("Нажимая кнопку, я соглашаюсь...").
         if (options.autoInjectCheckbox !== false) {
+            // Полностью заменяем содержимое блока на отрендеренный шаблон
+            // options.text + чекбокс. URL берём из существующей ссылки в блоке
+            // (если была) - чтобы не сломать ссылку на реальную политику сайта.
+            // Если ссылки не было - используем options.policyUrl.
+            var existingUrl = findExistingPolicyUrl(block);
+            var url = existingUrl || options.policyUrl;
+
+            // Очищаем блок и кладём отрендеренный текст шаблона
+            block.innerHTML = renderTextTemplate(options.text, url);
+
+            // Вставляем активный чекбокс в начало
             var injected = injectCheckboxIntoBlock(block, options);
             bindCheckboxToForm(form, injected, options);
+        } else {
+            // autoInjectCheckbox=false: не трогаем текст, только правим/добавляем ссылку
+            var linkUpdated = updatePolicyLink(block, options);
+            if (!linkUpdated && options.autoInjectLink) {
+                injectPolicyLink(block, options);
+            }
         }
 
         if (typeof options.onAutoMatch === 'function') {
             options.onAutoMatch(block, form);
         }
         return true;
+    }
+
+    // Возвращает href первой ссылки в блоке (или сам href, если блок - <a>).
+    // Игнорирует пустые/якорные ссылки. null - ссылки не найдено.
+    function findExistingPolicyUrl(block) {
+        var link = block.tagName === 'A' ? block : block.querySelector('a');
+        if (!link) return null;
+        var href = link.getAttribute('href');
+        if (!href) return null;
+        href = href.trim();
+        if (!href || href === '#') return null;
+        return href;
     }
 
     // Вставляет настоящий <input type="checkbox"> в начало декларативного
@@ -793,6 +849,6 @@
             if (options.injectStyles) injectStyles();
             processForm(form, options);
         },
-        version: '1.0.2'
+        version: '1.0.3'
     };
 }));
