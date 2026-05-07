@@ -13,7 +13,7 @@
 ## Подключение через CDN
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/USERNAME/consent-checkbox.js@v1.0.0/dist/consent-checkbox.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.1/dist/consent-checkbox.min.js"></script>
 <script>
     ConsentCheckbox.init({
         policyUrl: '/privacy-policy'
@@ -26,8 +26,6 @@
 ```html
 <script src="https://unpkg.com/consent-checkbox@1/dist/consent-checkbox.min.js"></script>
 ```
-
-> ⚠️ Замените `USERNAME` на свой ник на GitHub. После создания тега `v1.0.0` jsDelivr автоматически опубликует версию.
 
 ## Установка через npm
 
@@ -147,7 +145,7 @@ ConsentCheckbox.init({ injectStyles: false });
 ## Сборка
 
 ```bash
-git clone https://github.com/USERNAME/consent-checkbox.js
+git clone https://github.com/barocode/consent-checkbox
 cd consent-checkbox.js
 npm install
 npm run build

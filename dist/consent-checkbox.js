@@ -1,9 +1,9 @@
 /*!
- * ConsentCheckbox.js v1.0.0
+ * ConsentCheckbox.js v1.0.1
  * Универсальная библиотека для добавления чекбокса согласия на обработку
  * персональных данных ко всем формам на странице.
  *
- * https://github.com/USERNAME/consent-checkbox.js
+ * https://github.com/barocode/consent-checkbox
  * Лицензия: MIT
  */
 (function (root, factory) {

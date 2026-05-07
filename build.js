@@ -23,7 +23,7 @@ const OUT_MIN = path.join(DIST, 'consent-checkbox.min.js');
 
     const code = fs.readFileSync(SRC, 'utf8');
     const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
-    const banner = `/*! ConsentCheckbox.js v${pkg.version} | MIT License | https://github.com/USERNAME/consent-checkbox.js */\n`;
+    const banner = `/*! ConsentCheckbox.js v${pkg.version} | MIT License | https://github.com/barocode/consent-checkbox */\n`;
 
     // Полная версия — просто копируем (без баннера, он уже внутри файла)
     fs.writeFileSync(OUT_FULL, code, 'utf8');
