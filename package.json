@@ -1,0 +1,43 @@
+{
+  "name": "consent-checkbox",
+  "version": "1.0.0",
+  "description": "Универсальная JS-библиотека для добавления чекбокса согласия на обработку персональных данных ко всем формам на странице (152-ФЗ).",
+  "main": "src/consent-checkbox.js",
+  "module": "src/consent-checkbox.js",
+  "unpkg": "dist/consent-checkbox.min.js",
+  "jsdelivr": "dist/consent-checkbox.min.js",
+  "files": [
+    "src",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "consent",
+    "checkbox",
+    "gdpr",
+    "152-fz",
+    "privacy",
+    "personal-data",
+    "form",
+    "согласие",
+    "персональные-данные"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/USERNAME/consent-checkbox.js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/USERNAME/consent-checkbox.js/issues"
+  },
+  "homepage": "https://github.com/USERNAME/consent-checkbox.js#readme",
+  "devDependencies": {
+    "terser": "^5.31.0"
+  }
+}
