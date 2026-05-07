@@ -1,5 +1,5 @@
 /*!
- * ConsentCheckbox.js v1.0.1
+ * ConsentCheckbox.js v1.0.2
  * Универсальная библиотека для добавления чекбокса согласия на обработку
  * персональных данных ко всем формам на странице.
  *
@@ -74,6 +74,12 @@
         // Если найденный блок не содержит ссылку - добавить её к тексту.
         // false - оставить блок как есть (только привязать к нему submit-блокировку).
         autoInjectLink: true,
+
+        // Если найденный блок декларативный ("Нажимая кнопку, вы соглашаетесь...")
+        // и не содержит чекбокса - вставить настоящий <input type="checkbox">
+        // в начало блока и привязать к нему блокировку submit.
+        // false - оставить блок текстовым, без активного чекбокса.
+        autoInjectCheckbox: true,
 
         // Колбэки
         onChange: null, // function(checked, form) {}
@@ -169,6 +175,8 @@
         '.cc-tooltip{position:absolute;z-index:9999;background:#fff;border:1px solid #d0d0d0;border-radius:6px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:13px;line-height:1.4;color:#333;max-width:340px;font-family:inherit;animation:cc-fade .2s ease}',
         '.cc-tooltip::before{content:"";position:absolute;top:-6px;left:20px;width:10px;height:10px;background:#fff;border-left:1px solid #d0d0d0;border-top:1px solid #d0d0d0;transform:rotate(45deg)}',
         '.cc-tooltip .consent-checkbox{margin:0}',
+        '.cc-converted-block{display:block;opacity:1}',
+        '.cc-converted-block input.cc-injected-input{width:auto;height:auto;display:inline-block;margin-right:8px;vertical-align:middle}',
         '@keyframes cc-fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}'
     ].join('');
 
@@ -559,7 +567,7 @@
         }
 
         // Чекбокса нет - это декларативный блок ("Нажимая кнопку, я соглашаюсь...")
-        // Просто корректируем/добавляем ссылку на политику.
+        // Шаг 1: корректируем/добавляем ссылку на политику.
         var linkUpdated = updatePolicyLink(block, options);
 
         // Если ссылки не было и autoInjectLink=true - добавляем её
@@ -567,10 +575,67 @@
             injectPolicyLink(block, options);
         }
 
+        // Шаг 2: вставляем настоящий чекбокс в блок (превращаем декларативный
+        // блок в активный) и привязываем к нему блокировку submit.
+        if (options.autoInjectCheckbox !== false) {
+            var injected = injectCheckboxIntoBlock(block, options);
+            bindCheckboxToForm(form, injected, options);
+        }
+
         if (typeof options.onAutoMatch === 'function') {
             options.onAutoMatch(block, form);
         }
         return true;
+    }
+
+    // Вставляет настоящий <input type="checkbox"> в начало декларативного
+    // блока и делает клик по тексту блока (но не по ссылкам внутри) -
+    // переключающим чекбокс.
+    function injectCheckboxIntoBlock(block, options) {
+        var input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = generateId();
+        input.name = options.name;
+        if (options.defaultChecked) input.checked = true;
+        input.className = 'cc-injected-input';
+
+        // Минимальные inline-стили: чтобы не зависеть от
+        // injectStyles и не сломать существующий layout блока.
+        input.style.marginRight = '8px';
+        input.style.cursor = 'pointer';
+        input.style.verticalAlign = 'middle';
+        input.style.flexShrink = '0';
+
+        block.insertBefore(input, block.firstChild);
+        block.classList.add('cc-converted-block');
+
+        // Делаем сам блок кликабельным (как label), но не перехватываем
+        // клики по ссылкам/кнопкам/инпутам внутри.
+        block.style.cursor = 'pointer';
+        block.addEventListener('click', function (e) {
+            if (e.target === input) return;
+            var t = e.target;
+            while (t && t !== block) {
+                var tag = t.tagName;
+                if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' ||
+                    tag === 'LABEL' || tag === 'SELECT' || tag === 'TEXTAREA') {
+                    return;
+                }
+                t = t.parentNode;
+            }
+            input.checked = !input.checked;
+            // Совместимый способ диспатча change
+            var evt;
+            try {
+                evt = new Event('change', { bubbles: true });
+            } catch (err) {
+                evt = document.createEvent('Event');
+                evt.initEvent('change', true, true);
+            }
+            input.dispatchEvent(evt);
+        });
+
+        return input;
     }
 
     // Заменяет href у первой найденной ссылки в блоке (или в самом блоке,
@@ -728,6 +793,6 @@
             if (options.injectStyles) injectStyles();
             processForm(form, options);
         },
-        version: '1.0.0'
+        version: '1.0.2'
     };
 }));

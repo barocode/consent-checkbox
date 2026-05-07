@@ -13,7 +13,7 @@
 ## Подключение через CDN
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.1/dist/consent-checkbox.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.2/dist/consent-checkbox.min.js"></script>
 <script>
     ConsentCheckbox.init({
         policyUrl: '/privacy-policy'
@@ -21,7 +21,7 @@
 </script>
 ```
 
-Также доступно через **unpkg** после публикации в npm:
+Также доступно через **unpkg**:
 
 ```html
 <script src="https://unpkg.com/consent-checkbox@1/dist/consent-checkbox.min.js"></script>
@@ -98,6 +98,7 @@ ConsentCheckbox.init({
     autoSkip: true,                  // если блок уже с чекбоксом — не трогать
     autoFallbackMode: 'tooltip',     // что делать, если блок не найден
     autoInjectLink: true,            // дописать ссылку, если её не было
+    autoInjectCheckbox: true,        // вставить чекбокс в декларативный блок
 
     // Колбэки
     onChange:    function (checked, form) {},
@@ -116,7 +117,7 @@ ConsentCheckbox.init(options);
 ConsentCheckbox.applyTo(document.querySelector('#myForm'), options);
 
 // Версия
-ConsentCheckbox.version; // '1.0.0'
+ConsentCheckbox.version; // '1.0.2'
 ```
 
 ## Стилизация
