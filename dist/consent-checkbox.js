@@ -1,5 +1,5 @@
 /*!
- * ConsentCheckbox.js v1.0.5
+ * ConsentCheckbox.js v1.0.6
  * Универсальная библиотека для добавления чекбокса согласия на обработку
  * персональных данных ко всем формам на странице.
  *
@@ -214,7 +214,10 @@
         // Срезаем mask-плейсхолдеры (_ # *) и типичное форматирование.
         // То, что осталось - реально введённые буквы/цифры (или цифры
         // из самой маски, например "+7").
-        var clean = value.replace(/[_#*\s\-+().,/\\]/g, '');
+        // Дефис обязательно в конце класса - чтобы он гарантированно
+        // трактовался как литерал и при минификации не превратился в range
+        // (например, "+-(" стал бы range от + до ( и сломал regex).
+        var clean = value.replace(/[\s_#*+().,/-]/g, '');
         if (!clean) return false;
 
         var min = options.minMeaningfulChars || {};
@@ -223,19 +226,11 @@
     }
 
     function isFormFilled(form, options) {
-        // Если в форме фокусирован элемент из числа "заполняемых" полей -
-        // пользователь явно взаимодействует с формой, можно показать tooltip.
-        // ВАЖНО: проверяем именно matches(fillableSelector), а не просто
-        // form.contains(activeElement). Иначе клик по radio (например, по
-        // звезде в рейтинге) или чекбоксу будет фокусировать его и
-        // считаться "взаимодействием" - tooltip висел бы при выборе оценки.
         var ae = document.activeElement;
         if (ae && ae !== document.body && form.contains(ae)) {
             if (ae.matches && ae.matches(options.fillableSelector)) return true;
         }
 
-        // Дальше проверяем "значимые" поля. Радио и чекбоксы НЕ учитываются
-        // (см. fillableSelector в DEFAULTS).
         var fields = form.querySelectorAll(options.fillableSelector);
         for (var i = 0; i < fields.length; i++) {
             if (hasMeaningfulValue(fields[i], options)) return true;
@@ -929,6 +924,6 @@
             if (options.injectStyles) injectStyles();
             processForm(form, options);
         },
-        version: '1.0.5'
+        version: '1.0.6'
     };
 }));
