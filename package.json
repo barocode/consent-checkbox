@@ -1,6 +1,6 @@
 {
   "name": "consent-checkbox",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Универсальная JS-библиотека для добавления чекбокса согласия на обработку персональных данных ко всем формам на странице (152-ФЗ).",
   "main": "src/consent-checkbox.js",
   "module": "src/consent-checkbox.js",

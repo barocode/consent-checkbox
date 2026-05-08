@@ -13,7 +13,7 @@
 ## Подключение через CDN
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.3/dist/consent-checkbox.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/barocode/consent-checkbox@v1.0.5/dist/consent-checkbox.min.js"></script>
 <script>
     ConsentCheckbox.init({
         policyUrl: '/privacy-policy'
@@ -100,10 +100,54 @@ ConsentCheckbox.init({
     autoInjectLink: true,            // дописать ссылку, если её не было
     autoInjectCheckbox: true,        // вставить чекбокс в декларативный блок
 
+    // ---- Кнопки и поля ----
+
+    // Что считать submit-кнопкой. По умолчанию — стандартные варианты.
+    // Расширьте, если на сайте используются нестандартные кнопки:
+    submitSelector: 'button[type="submit"], input[type="submit"], ' +
+                    'input[type="image"], button:not([type])',
+
+    // Какие поля считать "заполняемыми" в tooltip-режиме.
+    // Радио и чекбоксы НЕ включены: выбор звёздного рейтинга или подписки
+    // на рассылку не должен показывать tooltip.
+    fillableSelector: 'input[type="text"], input[type="email"], ' +
+        'input[type="tel"], input[type="number"], input[type="url"], ' +
+        'input[type="password"], input[type="search"], input[type="date"], ' +
+        'input[type="datetime-local"], input[type="month"], input[type="week"], ' +
+        'input[type="time"], input:not([type]), textarea, select',
+
+    // Минимум "значимых" символов в значении, чтобы поле считалось заполненным.
+    // Для tel — 2 (т.к. в маске часто прошит код страны вроде +7).
+    minMeaningfulChars: { tel: 2, _default: 1 },
+
     // Колбэки
     onChange:    function (checked, form) {},
     onBlock:     function (form) {},          // submit заблокирован
     onAutoMatch: function (element, form) {}  // нашли существующий блок
+});
+```
+
+### Кастомные submit-кнопки
+
+Если на сайте кнопки отправки сделаны нестандартно — например, `<input type="button">` или просто `<a class="btn-submit">` — расширьте `submitSelector`:
+
+```js
+ConsentCheckbox.init({
+    submitSelector: 'button[type="submit"], input[type="submit"], ' +
+                    'input[type="image"], button:not([type]), ' +
+                    'input[type="button"].js-form-submit, a.btn-submit'
+});
+```
+
+Поддержка внешних кнопок (через атрибут `form="<id>"`) работает автоматически — каждая часть селектора применяется и внутри формы, и снаружи с фильтром `[form="<id>"]`.
+
+### Поля с масками
+
+Стандартное поведение хорошо работает с phone-масками вроде `+7 (___) ___-__-__`: символы маски отбрасываются перед измерением длины значения, поэтому tooltip не «висит» на пустом поле, в которое маска уже вставила плейсхолдеры. Если используете нестандартный mask-плейсхолдер, увеличьте порог:
+
+```js
+ConsentCheckbox.init({
+    minMeaningfulChars: { tel: 3, text: 2, _default: 1 }
 });
 ```
 
@@ -117,7 +161,7 @@ ConsentCheckbox.init(options);
 ConsentCheckbox.applyTo(document.querySelector('#myForm'), options);
 
 // Версия
-ConsentCheckbox.version; // '1.0.3'
+ConsentCheckbox.version; // '1.0.5'
 ```
 
 ## Стилизация

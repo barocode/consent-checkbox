@@ -1,5 +1,5 @@
 /*!
- * ConsentCheckbox.js v1.0.3
+ * ConsentCheckbox.js v1.0.5
  * Универсальная библиотека для добавления чекбокса согласия на обработку
  * персональных данных ко всем формам на странице.
  *
@@ -83,6 +83,36 @@
         // false - оставить текст блока как есть, только править/добавлять ссылку.
         autoInjectCheckbox: true,
 
+        // Селектор для submit-элементов внутри формы.
+        // По умолчанию учитывает <button type=submit>, <input type=submit/image>
+        // и <button> без type (по умолчанию это submit).
+        // Расширьте, если на сайте кнопки сделаны нестандартно, например:
+        //   submitSelector: 'button[type="submit"], input[type="submit"], ' +
+        //                   'input[type="image"], button:not([type]), ' +
+        //                   'input[type="button"].js-submit, .form-submit'
+        // Для каждой части селектора автоматически также проверяется
+        // соответствие атрибуту form="<id>" (внешние кнопки).
+        submitSelector: 'button[type="submit"], input[type="submit"], input[type="image"], button:not([type])',
+
+        // Селектор для "заполняемых" полей формы.
+        // По умолчанию - текстовые/числовые типы и textarea/select.
+        // Чекбоксы и радио НЕ включены: их состояние не считается признаком
+        // того, что пользователь собирается отправить форму (например, выбор
+        // звезды в рейтинге не должен показывать tooltip согласия).
+        fillableSelector: 'input[type="text"], input[type="email"], input[type="tel"], ' +
+            'input[type="number"], input[type="url"], input[type="password"], ' +
+            'input[type="search"], input[type="date"], input[type="datetime-local"], ' +
+            'input[type="month"], input[type="week"], input[type="time"], ' +
+            'input:not([type]), textarea, select',
+
+        // Минимальное количество "значимых" символов в значении поля,
+        // чтобы оно считалось реально заполненным. Для tel-полей - 2
+        // (потому что в маске часто прошит код страны вроде +7, +1).
+        // Для остальных типов - 1.
+        // Значимыми считаются буквы и цифры; mask-плейсхолдеры (_ # *)
+        // и форматирующие символы (- + ( ) пробелы . , / \) отбрасываются.
+        minMeaningfulChars: { tel: 2, _default: 1 },
+
         // Колбэки
         onChange: null, // function(checked, form) {}
         onBlock: null,  // function(form) {} вызывается при попытке submit без согласия
@@ -109,19 +139,43 @@
         return 'cc_' + Math.random().toString(36).slice(2, 10);
     }
 
-    function getSubmitButtons(form) {
-        // Кнопки submit, в т.ч. <button> без type (по умолчанию submit)
-        // и связанные кнопки через атрибут form="id"
-        var inForm = form.querySelectorAll(
-            'button[type="submit"], input[type="submit"], input[type="image"], button:not([type])'
-        );
+    // Безопасно делит CSS-селектор по запятым с учётом скобок (), [].
+    // Чтобы не сломать конструкции вроде :is(a, b) или [data-x="a,b"].
+    function splitSelectorByCommas(sel) {
+        var parts = [];
+        var depth = 0;
+        var current = '';
+        for (var i = 0; i < sel.length; i++) {
+            var c = sel.charAt(i);
+            if (c === '(' || c === '[') depth++;
+            else if (c === ')' || c === ']') depth--;
+            else if (c === ',' && depth === 0) {
+                if (current.trim()) parts.push(current.trim());
+                current = '';
+                continue;
+            }
+            current += c;
+        }
+        if (current.trim()) parts.push(current.trim());
+        return parts;
+    }
+
+    function getSubmitButtons(form, options) {
+        var sel = options.submitSelector;
+        var inForm = form.querySelectorAll(sel);
         var external = [];
         if (form.id) {
-            external = document.querySelectorAll(
-                'button[type="submit"][form="' + form.id + '"], ' +
-                'input[type="submit"][form="' + form.id + '"], ' +
-                'button[form="' + form.id + '"]:not([type])'
-            );
+            // Для каждой части селектора добавляем фильтр [form="id"],
+            // чтобы найти внешние кнопки, привязанные к форме через form-attr.
+            var parts = splitSelectorByCommas(sel);
+            var externalSel = parts.map(function (p) {
+                return p + '[form="' + form.id + '"]';
+            }).join(', ');
+            try {
+                external = document.querySelectorAll(externalSel);
+            } catch (e) {
+                external = [];
+            }
         }
         var result = Array.prototype.slice.call(inForm);
         Array.prototype.forEach.call(external, function (btn) {
@@ -130,8 +184,8 @@
         return result;
     }
 
-    function setSubmitState(form, enabled) {
-        var buttons = getSubmitButtons(form);
+    function setSubmitState(form, enabled, options) {
+        var buttons = getSubmitButtons(form, options);
         buttons.forEach(function (btn) {
             if (enabled) {
                 btn.disabled = false;
@@ -145,20 +199,46 @@
         });
     }
 
-    function isFormFilled(form) {
-        // Считаем форму "заполняемой", если хотя бы одно текстовое/выбираемое поле
-        // имеет значение или находится в фокусе.
-        var fields = form.querySelectorAll(
-            'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select'
-        );
+    // Определяет, содержит ли значение реальный пользовательский ввод
+    // (а не только символы маски). Маски телефонов вроде "+7 (___) ___-__-__"
+    // оставляли поле "не пустым" - из-за чего tooltip висел постоянно.
+    function hasMeaningfulValue(el, options) {
+        var raw = el.value;
+        if (raw == null) return false;
+        var value = String(raw).trim();
+        if (!value) return false;
+
+        // У <select> любое выбранное значение != "" - осмысленный выбор.
+        if (el.tagName === 'SELECT') return true;
+
+        // Срезаем mask-плейсхолдеры (_ # *) и типичное форматирование.
+        // То, что осталось - реально введённые буквы/цифры (или цифры
+        // из самой маски, например "+7").
+        var clean = value.replace(/[_#*\s\-+().,/\\]/g, '');
+        if (!clean) return false;
+
+        var min = options.minMeaningfulChars || {};
+        var threshold = min[el.type] || min._default || 1;
+        return clean.length >= threshold;
+    }
+
+    function isFormFilled(form, options) {
+        // Если в форме фокусирован элемент из числа "заполняемых" полей -
+        // пользователь явно взаимодействует с формой, можно показать tooltip.
+        // ВАЖНО: проверяем именно matches(fillableSelector), а не просто
+        // form.contains(activeElement). Иначе клик по radio (например, по
+        // звезде в рейтинге) или чекбоксу будет фокусировать его и
+        // считаться "взаимодействием" - tooltip висел бы при выборе оценки.
+        var ae = document.activeElement;
+        if (ae && ae !== document.body && form.contains(ae)) {
+            if (ae.matches && ae.matches(options.fillableSelector)) return true;
+        }
+
+        // Дальше проверяем "значимые" поля. Радио и чекбоксы НЕ учитываются
+        // (см. fillableSelector в DEFAULTS).
+        var fields = form.querySelectorAll(options.fillableSelector);
         for (var i = 0; i < fields.length; i++) {
-            var el = fields[i];
-            if (el === document.activeElement) return true;
-            if (el.type === 'checkbox' || el.type === 'radio') {
-                if (el.checked) return true;
-            } else if (el.value && String(el.value).trim() !== '') {
-                return true;
-            }
+            if (hasMeaningfulValue(fields[i], options)) return true;
         }
         return false;
     }
@@ -262,11 +342,11 @@
     // ====================================================================
     function bindCheckboxToForm(form, checkboxInput, options) {
         // Стартовое состояние
-        setSubmitState(form, checkboxInput.checked);
+        setSubmitState(form, checkboxInput.checked, options);
 
         // При изменении чекбокса
         checkboxInput.addEventListener('change', function () {
-            setSubmitState(form, checkboxInput.checked);
+            setSubmitState(form, checkboxInput.checked, options);
             if (typeof options.onChange === 'function') {
                 options.onChange(checkboxInput.checked, form);
             }
@@ -302,7 +382,7 @@
     // ====================================================================
     function applyAfterSubmitMode(form, options) {
         var built = buildCheckbox(options);
-        var submits = getSubmitButtons(form);
+        var submits = getSubmitButtons(form, options);
         var anchor = submits[0];
 
         if (anchor && anchor.parentNode) {
@@ -362,7 +442,7 @@
         var destroyed = false;
 
         function getAnchor() {
-            return getSubmitButtons(form)[0] || null;
+            return getSubmitButtons(form, options)[0] || null;
         }
 
         function positionTooltip() {
@@ -437,7 +517,7 @@
                 return;
             }
 
-            if (isFormFilled(form)) showTooltip();
+            if (isFormFilled(form, options)) showTooltip();
             else hideTooltip();
         }
 
@@ -849,6 +929,6 @@
             if (options.injectStyles) injectStyles();
             processForm(form, options);
         },
-        version: '1.0.3'
+        version: '1.0.5'
     };
 }));
